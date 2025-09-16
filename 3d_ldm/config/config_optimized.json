@@ -1,0 +1,48 @@
+{
+    "channel": 1,
+    "spacing": [
+        5,
+        3.2,
+        3.2
+    ],
+    "spatial_dims": 3,
+    "image_channels": 1,
+    "latent_channels": 16,
+    "autoencoder_def": {
+        "_target_": "monai.networks.nets.AutoencoderKL",
+        "spatial_dims": "@spatial_dims",
+        "in_channels": "$@image_channels",
+        "out_channels": "@image_channels",
+        "latent_channels": "@latent_channels",
+        "channels": [
+            128,
+            256,
+            256
+        ],
+        "num_res_blocks": 2,
+        "norm_num_groups": 32,
+        "norm_eps": 1e-06,
+        "attention_levels": [
+            false,
+            true,
+            true
+        ],
+        "with_encoder_nonlocal_attn": false,
+        "with_decoder_nonlocal_attn": true
+    },
+    "autoencoder_train": {
+        "batch_size": 2,
+        "patch_size": [
+            64,
+            64,
+            64
+        ],
+        "lr": 0.001,
+        "lr_scheduler": "warmup_cosine",
+        "perceptual_weight": 0.001,
+        "kl_weight": 1e-07,
+        "recon_loss": "l2",
+        "max_epochs": 1000,
+        "val_interval": 10
+    }
+}

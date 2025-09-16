@@ -1,0 +1,57 @@
+{
+    "channel": 1,
+    "spacing": [5, 3.2, 3.2],
+    "spatial_dims": 3,
+    "image_channels": 1,
+    "latent_channels": 8,
+    "autoencoder_def": {
+        "_target_": "monai.networks.nets.AutoencoderKL",
+        "spatial_dims": "@spatial_dims",
+        "in_channels": "$@image_channels",
+        "out_channels": "@image_channels",
+        "latent_channels": "@latent_channels",
+        "channels": [
+            32,
+            64,
+            128
+        ],
+        "num_res_blocks": 1,
+        "norm_num_groups": 16,
+        "norm_eps": 1e-06,
+        "attention_levels": [
+            false,
+            false,
+            true
+        ],
+        "with_encoder_nonlocal_attn": false,
+        "with_decoder_nonlocal_attn": false
+    },
+    "autoencoder_train": {
+        "batch_size": 1,
+        "patch_size": [48, 48, 48],
+        "lr": 1e-4,
+        "perceptual_weight": 0.00001,
+        "kl_weight": 1e-9,
+        "recon_loss": "l1",
+        "max_epochs": 1000,
+        "val_interval": 5
+    },
+    "diffusion_def": {
+        "_target_": "monai.networks.nets.DiffusionModelUNet",
+        "spatial_dims": "@spatial_dims",
+        "in_channels": 16,
+        "out_channels": "@latent_channels",
+        "channels":[128, 256, 512],
+        "attention_levels":[false, false, true],
+        "num_head_channels":[0, 0, 32],
+        "num_res_blocks": 1
+    },
+    "diffusion_train": {
+        "batch_size": 10,
+        "patch_size": [48, 48, 48],
+        "lr": 1e-4,
+        "max_epochs": 1000,
+        "val_interval": 10,
+        "save_interval": 10
+    }
+}
