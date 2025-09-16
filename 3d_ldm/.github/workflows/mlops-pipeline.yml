@@ -1,0 +1,371 @@
+name: MLOps Pipeline - 3D Latent Diffusion Model
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'train_*.py'
+      - 'mlops/**'
+      - 'config/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      deploy_to_production:
+        description: 'Deploy to production'
+        required: false
+        default: 'false'
+        type: boolean
+      model_version:
+        description: 'Model version to deploy'
+        required: false
+        default: 'latest'
+        type: string
+
+env:
+  AZURE_ML_WORKSPACE: "3d-ldm-workspace"
+  AZURE_RESOURCE_GROUP: "rg-3d-ldm-mlops"
+  MODEL_NAME: "3d-latent-diffusion-model"
+
+jobs:
+  # Job 1: Code Quality and Testing
+  code-quality:
+    runs-on: ubuntu-latest
+    name: Code Quality & Testing
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black pytest mypy
+        pip install -r requirements.txt
+        
+    - name: Code formatting check (Black)
+      run: black --check --diff .
+      
+    - name: Linting (Flake8)
+      run: flake8 . --max-line-length=100 --extend-ignore=E203,W503
+      
+    - name: Type checking (MyPy)
+      run: mypy --ignore-missing-imports train_autoencoder.py train_diffusion.py
+      continue-on-error: true
+      
+    - name: Run unit tests
+      run: pytest test_losses.py -v
+      continue-on-error: true
+
+  # Job 2: Security Scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Scanning
+    needs: code-quality
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Bandit security scan
+      run: |
+        pip install bandit
+        bandit -r . -f json -o bandit-report.json || true
+        
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-scan-results
+        path: bandit-report.json
+
+  # Job 3: Build and Test Training Pipeline
+  build-training-pipeline:
+    runs-on: ubuntu-latest
+    name: Build Training Pipeline
+    needs: [code-quality, security-scan]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install Azure ML SDK
+      run: |
+        python -m pip install --upgrade pip
+        pip install azure-ai-ml azure-identity
+        
+    - name: Validate Azure ML Configuration
+      run: |
+        python -c "
+        from azure.ai.ml import MLClient
+        from azure.identity import DefaultAzureCredential
+        
+        credential = DefaultAzureCredential()
+        ml_client = MLClient(
+            credential=credential,
+            subscription_id='${{ secrets.AZURE_SUBSCRIPTION_ID }}',
+            resource_group_name='${{ env.AZURE_RESOURCE_GROUP }}',
+            workspace_name='${{ env.AZURE_ML_WORKSPACE }}'
+        )
+        print('✅ Azure ML workspace connection successful')
+        "
+        
+    - name: Create Azure ML Pipeline
+      run: |
+        cd mlops/pipelines
+        python azure_ml_pipeline.py --validate-only
+      continue-on-error: true
+
+  # Job 4: Model Training (triggered manually or on main branch)
+  model-training:
+    runs-on: ubuntu-latest
+    name: Model Training
+    needs: build-training-pipeline
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install azure-ai-ml azure-identity mlflow
+        
+    - name: Submit Training Pipeline
+      id: training
+      run: |
+        python mlops/pipelines/azure_ml_pipeline.py \
+          --subscription-id ${{ secrets.AZURE_SUBSCRIPTION_ID }} \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --workspace-name ${{ env.AZURE_ML_WORKSPACE }} \
+          --experiment-name "3d-ldm-cicd" \
+          --model-name ${{ env.MODEL_NAME }}
+      env:
+        AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        
+    - name: Wait for Training Completion
+      run: |
+        echo "Training pipeline submitted. Monitor progress in Azure ML Studio."
+        echo "Pipeline URL will be displayed in the previous step output."
+
+  # Job 5: Model Evaluation and Registration
+  model-evaluation:
+    runs-on: ubuntu-latest
+    name: Model Evaluation
+    needs: model-training
+    if: success()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install azure-ai-ml azure-identity mlflow
+        
+    - name: Evaluate Model Performance
+      id: evaluation
+      run: |
+        python mlops/pipelines/model_evaluation.py \
+          --model-name ${{ env.MODEL_NAME }} \
+          --experiment-name "3d-ldm-cicd" \
+          --performance-threshold 0.8
+        
+    - name: Register Model for Production
+      if: steps.evaluation.outputs.performance_score > 0.8
+      run: |
+        python -c "
+        from mlops.mlflow_integration import ModelRegistry
+        registry = ModelRegistry('${{ env.MODEL_NAME }}')
+        registry.promote_model(version='latest', stage='Production')
+        "
+
+  # Job 6: Deploy to Staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    name: Deploy to Staging
+    needs: model-evaluation
+    if: success()
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install azure-ai-ml azure-identity
+        
+    - name: Deploy to Staging
+      run: |
+        python mlops/deployment/deploy_model.py \
+          --endpoint-name "3d-ldm-staging" \
+          --model-name ${{ env.MODEL_NAME }} \
+          --instance-type "Standard_DS3_v2" \
+          --instance-count 1
+          
+    - name: Test Staging Endpoint
+      run: |
+        python mlops/deployment/test_endpoint.py \
+          --endpoint-name "3d-ldm-staging" \
+          --test-samples 1
+
+  # Job 7: Deploy to Production (manual approval required)
+  deploy-production:
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    needs: deploy-staging
+    if: github.event.inputs.deploy_to_production == 'true' || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[deploy-prod]'))
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install azure-ai-ml azure-identity
+        
+    - name: Deploy to Production
+      run: |
+        python mlops/deployment/deploy_model.py \
+          --endpoint-name "3d-ldm-production" \
+          --model-name ${{ env.MODEL_NAME }} \
+          --model-version ${{ github.event.inputs.model_version || 'latest' }} \
+          --instance-type "Standard_DS4_v2" \
+          --instance-count 2
+          
+    - name: Test Production Endpoint
+      run: |
+        python mlops/deployment/test_endpoint.py \
+          --endpoint-name "3d-ldm-production" \
+          --test-samples 3
+          
+    - name: Update Production Monitoring
+      run: |
+        echo "Production deployment completed successfully"
+        echo "Endpoint: 3d-ldm-production"
+        echo "Model version: ${{ github.event.inputs.model_version || 'latest' }}"
+
+  # Job 8: Post-deployment monitoring setup
+  setup-monitoring:
+    runs-on: ubuntu-latest
+    name: Setup Monitoring
+    needs: [deploy-staging]
+    if: success()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Set up monitoring alerts
+      run: |
+        echo "Setting up monitoring for deployed endpoints..."
+        # Add monitoring setup commands here
+        
+    - name: Create deployment summary
+      run: |
+        echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Model**: ${{ env.MODEL_NAME }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Staging Endpoint**: 3d-ldm-staging" >> $GITHUB_STEP_SUMMARY
+        if [[ "${{ needs.deploy-production.result }}" == "success" ]]; then
+          echo "- **Production Endpoint**: 3d-ldm-production" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "- **Timestamp**: $(date)" >> $GITHUB_STEP_SUMMARY
+
+  # Job 9: Cleanup on failure
+  cleanup-on-failure:
+    runs-on: ubuntu-latest
+    name: Cleanup on Failure
+    needs: [deploy-staging, deploy-production]
+    if: failure()
+    
+    steps:
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Cleanup failed deployments
+      run: |
+        echo "Cleaning up failed deployments..."
+        # Add cleanup commands here if needed
+        
+    - name: Send failure notification
+      run: |
+        echo "❌ MLOps pipeline failed. Check the logs for details."

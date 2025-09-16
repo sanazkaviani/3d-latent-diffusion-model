@@ -1,0 +1,33 @@
+# Azure ML Workspace Configuration
+workspace_name: "3d-ldm-workspace"
+resource_group: "rg-3d-ldm-mlops"
+subscription_id: "YOUR_SUBSCRIPTION_ID"  # Replace with your Azure subscription ID
+location: "East US"  # Choose your preferred Azure region
+
+# Compute configuration
+compute_targets:
+  training_cluster:
+    name: "gpu-cluster"
+    vm_size: "Standard_NC24ads_A100_v4"  # A100 GPUs for training
+    min_nodes: 0
+    max_nodes: 4
+    idle_seconds_before_scaledown: 300
+    
+  inference_cluster:
+    name: "inference-cluster"
+    vm_size: "Standard_DS3_v2"  # CPU for inference
+    min_nodes: 1
+    max_nodes: 3
+    idle_seconds_before_scaledown: 120
+
+# Storage configuration
+datastore:
+  name: "3dldm_datastore"
+  container_name: "3dldm-data"
+  account_name: "3dldmstorage"  # Replace with your storage account name
+
+# Environment configuration
+environment:
+  name: "3d-ldm-env"
+  conda_file: "conda_env.yml"
+  docker_base_image: "mcr.microsoft.com/azureml/pytorch-2.0-ubuntu20.04-py38-cuda11.7-gpu:latest"

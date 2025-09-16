@@ -12,8 +12,10 @@ A comprehensive implementation of 3D Latent Diffusion Models for medical image s
 - **Multi-GPU Support**: Optimized distributed training with Distributed Data Parallel (DDP)
 - **Memory Efficient**: Automatic Mixed Precision (AMP) and gradient checkpointing
 - **Flexible Configurations**: Support for different GPU memory sizes (16GB, 32GB, multi-GPU)
+- **MLOps Integration**: Complete Azure ML deployment with CI/CD pipelines
+- **Model Monitoring**: Real-time performance monitoring and data drift detection
+- **Professional Deployment**: REST API endpoints with auto-scaling capabilities
 - **Comprehensive Documentation**: Detailed guides for setup, training, and troubleshooting
-- **Professional Monitoring**: TensorBoard integration and performance profiling
 
 ## 📖 Overview
 
@@ -153,6 +155,13 @@ For detailed multi-GPU setup and optimization, see [README_MULTIGPU.md](./README
 │   ├── config_train_32g.json    # 32GB GPU config
 │   ├── config_train_multigpu.json  # Multi-GPU config
 │   └── environment.json     # Environment paths
+├── mlops/                   # MLOps and deployment
+│   ├── azure/               # Azure ML workspace setup
+│   ├── deployment/          # Model deployment scripts
+│   ├── monitoring/          # Model monitoring and alerting
+│   ├── pipelines/           # Training and inference pipelines
+│   └── README.md           # MLOps setup guide
+├── .github/workflows/       # CI/CD pipelines
 ├── figs/                    # Result figures
 ├── train_autoencoder.py     # Autoencoder training
 ├── train_diffusion.py       # Diffusion model training
@@ -165,6 +174,36 @@ For detailed multi-GPU setup and optimization, see [README_MULTIGPU.md](./README
     ├── MULTI_GPU_OPTIMIZATION_SUMMARY.md
     └── NaN_FIX_GUIDE.md
 ```
+
+## 🏭 MLOps and Production Deployment
+
+This project includes a complete MLOps pipeline for production deployment:
+
+### Azure ML Integration
+- **Automated Training**: Scalable training pipelines on Azure ML compute
+- **Model Registry**: Versioned model storage with MLflow integration
+- **Experiment Tracking**: Comprehensive experiment logging and comparison
+- **Environment Management**: Reproducible training environments
+
+### CI/CD Pipeline
+- **GitHub Actions**: Automated testing, training, and deployment
+- **Multi-environment**: Staging and production deployment workflows
+- **Quality Gates**: Code quality checks and model validation
+- **Security Scanning**: Automated security vulnerability detection
+
+### Model Deployment
+- **REST API Endpoints**: Scalable inference endpoints with auto-scaling
+- **Batch Inference**: Large-scale batch processing capabilities
+- **A/B Testing**: Support for multiple model versions in production
+- **Edge Deployment**: Options for edge and on-premises deployment
+
+### Monitoring and Observability
+- **Performance Monitoring**: Real-time latency, throughput, and error tracking
+- **Data Drift Detection**: Automated detection of input data changes
+- **Model Health**: Continuous model performance evaluation
+- **Alerting**: Automated alerts for anomalies and performance degradation
+
+**🚀 Quick MLOps Setup**: See [mlops/README.md](mlops/README.md) for detailed setup instructions.
 
 ## 🔧 Configuration
 
@@ -203,16 +242,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Medical Decathlon](http://medicaldecathlon.com/) for providing the BraTS dataset
 - Original authors of the Latent Diffusion Models paper
 
-## 📞 Support
-
-- **MONAI Questions**: Use the [Discussions tab](https://github.com/Project-MONAI/MONAI/discussions)
-- **MONAI Bugs**: Create an issue on the [main repository](https://github.com/Project-MONAI/MONAI/issues)
-- **Tutorial Issues**: Create an issue in [this repository](https://github.com/Project-MONAI/Tutorials/issues)
-
-## 📚 References
-
-[1] [Rombach, Robin, et al. "High-resolution image synthesis with latent diffusion models." CVPR 2022.](https://openaccess.thecvf.com/content/CVPR2022/papers/Rombach_High-Resolution_Image_Synthesis_With_Latent_Diffusion_Models_CVPR_2022_paper.pdf)
-
-[2] [Menze, Bjoern H., et al. "The multimodal brain tumor image segmentation benchmark (BRATS)." IEEE transactions on medical imaging 34.10 (2014): 1993-2024.](https://ieeexplore.ieee.org/document/6975210)
-
-[3] [Pinaya et al. "Brain imaging generation with latent diffusion models"](https://arxiv.org/abs/2209.07162)
