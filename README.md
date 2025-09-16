@@ -266,21 +266,21 @@ For detailed multi-GPU setup and optimization, see [README_MULTIGPU.md](./README
 ### Training Performance
 <!-- Training curves demonstrate model convergence and learning stability -->
 <p align="center">
-  <img src="./figs/train_recon.png" alt="autoencoder train curve" width="45%">
-  <img src="./figs/val_recon.png" alt="autoencoder validation curve" width="45%">
+  <img src="3d_ldm/figs/train_recon.png" alt="autoencoder train curve" width="45%">
+  <img src="3d_ldm/figs/val_recon.png" alt="autoencoder validation curve" width="45%">
 </p>
 
 <p align="center">
-  <img src="./figs/train_diffusion.png" alt="diffusion train curve" width="45%">
-  <img src="./figs/val_diffusion.png" alt="diffusion validation curve" width="45%">
+  <img src="3d_ldm/figs/train_diffusion.png" alt="diffusion train curve" width="45%">
+  <img src="3d_ldm/figs/val_diffusion.png" alt="diffusion validation curve" width="45%">
 </p>
 
 ### Generated Samples
 <!-- Examples of synthetic brain MRI images in different anatomical views -->
 <p align="center">
-  <img src="./figs/syn_axial.png" alt="generated axial" width="30%">
-  <img src="./figs/syn_cor.png" alt="generated coronal" width="30%">
-  <img src="./figs/syn_sag.png" alt="generated sagittal" width="30%">
+  <img src="3d_ldm/figs/syn_axial.png" alt="generated axial" width="30%">
+  <img src="3d_ldm/figs/syn_cor.png" alt="generated coronal" width="30%">
+  <img src="3d_ldm/figs/syn_sag.png" alt="generated sagittal" width="30%">
 </p>
 
 ## 🚀 Deployment Options
