@@ -1,0 +1,166 @@
+# Job for model training on Kubernetes
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: 3d-ldm-training
+  namespace: 3d-ldm
+  labels:
+    app: 3d-ldm-training
+    type: autoencoder  # or diffusion
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400  # Clean up after 24 hours
+  template:
+    metadata:
+      labels:
+        app: 3d-ldm-training
+        type: autoencoder
+    spec:
+      restartPolicy: Never
+      serviceAccountName: 3d-ldm-service-account
+      containers:
+      - name: training
+        image: your-registry/3d-ldm:latest
+        imagePullPolicy: Always
+        env:
+        - name: MODE
+          value: "train"
+        - name: TRAIN_TYPE
+          value: "autoencoder"  # or diffusion
+        - name: CONFIG_FILE
+          value: "/app/config/config.json"
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0,1,2,3"  # Use multiple GPUs
+        resources:
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+            nvidia.com/gpu: 4
+          limits:
+            cpu: "16"
+            memory: "64Gi"
+            nvidia.com/gpu: 4
+        volumeMounts:
+        - name: models-volume
+          mountPath: /app/models
+        - name: data-volume
+          mountPath: /app/data
+        - name: outputs-volume
+          mountPath: /app/outputs
+        - name: config-volume
+          mountPath: /app/config
+        - name: training-logs
+          mountPath: /app/logs
+      volumes:
+      - name: models-volume
+        persistentVolumeClaim:
+          claimName: 3d-ldm-models-pvc
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: 3d-ldm-data-pvc
+      - name: outputs-volume
+        persistentVolumeClaim:
+          claimName: 3d-ldm-outputs-pvc
+      - name: config-volume
+        configMap:
+          name: 3d-ldm-config
+      - name: training-logs
+        emptyDir: {}
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      nodeSelector:
+        node-type: gpu-training  # Dedicated training nodes
+---
+# CronJob for periodic model retraining
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: 3d-ldm-retrain
+  namespace: 3d-ldm
+spec:
+  schedule: "0 2 * * 1"  # Every Monday at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: 3d-ldm-service-account
+          containers:
+          - name: retrain
+            image: your-registry/3d-ldm:latest
+            imagePullPolicy: Always
+            env:
+            - name: MODE
+              value: "train"
+            - name: TRAIN_TYPE
+              value: "full"  # Full retraining pipeline
+            resources:
+              requests:
+                cpu: "4"
+                memory: "16Gi"
+                nvidia.com/gpu: 2
+              limits:
+                cpu: "8"
+                memory: "32Gi"
+                nvidia.com/gpu: 2
+            volumeMounts:
+            - name: models-volume
+              mountPath: /app/models
+            - name: data-volume
+              mountPath: /app/data
+          volumes:
+          - name: models-volume
+            persistentVolumeClaim:
+              claimName: 3d-ldm-models-pvc
+          - name: data-volume
+            persistentVolumeClaim:
+              claimName: 3d-ldm-data-pvc
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+---
+# Job for batch inference
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: 3d-ldm-batch-inference
+  namespace: 3d-ldm
+spec:
+  parallelism: 2  # Run 2 inference jobs in parallel
+  completions: 10  # Generate 10 batches total
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: inference
+        image: your-registry/3d-ldm:latest
+        imagePullPolicy: Always
+        env:
+        - name: MODE
+          value: "inference"
+        - name: NUM_SAMPLES
+          value: "5"
+        resources:
+          requests:
+            cpu: "2"
+            memory: "8Gi"
+            nvidia.com/gpu: 1
+          limits:
+            cpu: "4"
+            memory: "16Gi"
+            nvidia.com/gpu: 1
+        volumeMounts:
+        - name: models-volume
+          mountPath: /app/models
+        - name: outputs-volume
+          mountPath: /app/outputs
+      volumes:
+      - name: models-volume
+        persistentVolumeClaim:
+          claimName: 3d-ldm-models-pvc
+      - name: outputs-volume
+        persistentVolumeClaim:
+          claimName: 3d-ldm-outputs-pvc
