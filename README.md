@@ -128,13 +128,13 @@ For detailed multi-GPU setup and optimization, see [README_MULTIGPU.md](./README
 
 ### Training Performance
 <p align="center">
-  <img src="./figs/train_recon.png" alt="autoencoder train curve" width="45%">
-  <img src="./figs/val_recon.png" alt="autoencoder validation curve" width="45%">
+  <img src="3d_ldm/figs/train_recon.png" alt="autoencoder train curve" width="45%">
+  <img src="3d_ldm/figs/val_recon.png" alt="autoencoder validation curve" width="45%">
 </p>
 
 <p align="center">
   <img src="3d_ldm/figs/train_diffusion.png" alt="latent diffusion train curve" width="45%">
-  <img src="./figs/val_diffusion.png" alt="latent diffusion validation curve" width="45%">
+  <img src="3d_ldm/figs/val_diffusion.png" alt="latent diffusion validation curve" width="45%">
 </p>
 
 ### Generated Samples
