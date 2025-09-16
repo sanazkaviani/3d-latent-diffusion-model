@@ -807,19 +807,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **BraTS Challenge**: For providing the medical imaging dataset
 - **PyTorch Team**: For the excellent deep learning framework
 
-## 📞 Support
-
-<!--
-  Support Channels:
-  Multiple ways for users to get help and engage with the project
--->
-For questions, issues, or contributions:
-
-- 📧 **Email**: [your-email@domain.com]
-- 💬 **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
-- 📖 **Documentation**: [Project Wiki](https://github.com/your-repo/wiki)
-- 🐛 **Bug Reports**: Use the issue template for detailed bug reports
-
 ---
 
 <!--
