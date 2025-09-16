@@ -133,15 +133,15 @@ For detailed multi-GPU setup and optimization, see [README_MULTIGPU.md](./README
 </p>
 
 <p align="center">
-  <img src="./figs/train_diffusion.png" alt="latent diffusion train curve" width="45%">
+  <img src="3d_ldm/figs/train_diffusion.png" alt="latent diffusion train curve" width="45%">
   <img src="./figs/val_diffusion.png" alt="latent diffusion validation curve" width="45%">
 </p>
 
 ### Generated Samples
 <p align="center">
-  <img src="./figs/syn_axial.png" width="30%">
-  <img src="./figs/syn_sag.png" width="30%">
-  <img src="./figs/syn_cor.png" width="30%">
+  <img src="3d_ldm/figs/syn_axial.png" width="30%">
+  <img src="3d_ldm/figs/syn_sag.png" width="30%">
+  <img src="3d_ldm/figs/syn_cor.png" width="30%">
 </p>
 
 ## 📁 Project Structure
