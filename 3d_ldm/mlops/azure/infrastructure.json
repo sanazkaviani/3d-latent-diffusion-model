@@ -1,0 +1,299 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "resourcePrefix": {
+            "type": "string",
+            "defaultValue": "3dldm",
+            "metadata": {
+                "description": "Prefix for all resources"
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location for all resources"
+            }
+        },
+        "environment": {
+            "type": "string",
+            "defaultValue": "dev",
+            "allowedValues": ["dev", "staging", "prod"],
+            "metadata": {
+                "description": "Environment name"
+            }
+        },
+        "aksNodeCount": {
+            "type": "int",
+            "defaultValue": 3,
+            "minValue": 1,
+            "maxValue": 10,
+            "metadata": {
+                "description": "Number of AKS nodes"
+            }
+        },
+        "aksNodeSize": {
+            "type": "string",
+            "defaultValue": "Standard_D4s_v3",
+            "metadata": {
+                "description": "AKS node VM size"
+            }
+        },
+        "enableGpu": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Enable GPU nodes for training"
+            }
+        }
+    },
+    "variables": {
+        "resourcePrefix": "[toLower(parameters('resourcePrefix'))]",
+        "acrName": "[concat(variables('resourcePrefix'), 'acr', parameters('environment'))]",
+        "aksName": "[concat(variables('resourcePrefix'), '-aks-', parameters('environment'))]",
+        "keyVaultName": "[concat(variables('resourcePrefix'), '-kv-', parameters('environment'))]",
+        "storageAccountName": "[concat(variables('resourcePrefix'), 'storage', parameters('environment'))]",
+        "appInsightsName": "[concat(variables('resourcePrefix'), '-ai-', parameters('environment'))]",
+        "logAnalyticsName": "[concat(variables('resourcePrefix'), '-law-', parameters('environment'))]",
+        "mlWorkspaceName": "[concat(variables('resourcePrefix'), '-ml-', parameters('environment'))]",
+        "cosmosDbName": "[concat(variables('resourcePrefix'), '-cosmos-', parameters('environment'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2023-01-01",
+            "name": "[variables('storageAccountName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "supportsHttpsTrafficOnly": true,
+                "allowBlobPublicAccess": false,
+                "minimumTlsVersion": "TLS1_2",
+                "accessTier": "Hot"
+            }
+        },
+        {
+            "type": "Microsoft.ContainerRegistry/registries",
+            "apiVersion": "2023-07-01",
+            "name": "[variables('acrName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Premium"
+            },
+            "properties": {
+                "adminUserEnabled": true,
+                "publicNetworkAccess": "Enabled",
+                "networkRuleBypassOptions": "AzureServices"
+            }
+        },
+        {
+            "type": "Microsoft.OperationalInsights/workspaces",
+            "apiVersion": "2023-09-01",
+            "name": "[variables('logAnalyticsName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "sku": {
+                    "name": "PerGB2018"
+                },
+                "retentionInDays": 30
+            }
+        },
+        {
+            "type": "Microsoft.Insights/components",
+            "apiVersion": "2020-02-02",
+            "name": "[variables('appInsightsName')]",
+            "location": "[parameters('location')]",
+            "kind": "web",
+            "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]"
+            ],
+            "properties": {
+                "Application_Type": "web",
+                "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]"
+            }
+        },
+        {
+            "type": "Microsoft.KeyVault/vaults",
+            "apiVersion": "2023-07-01",
+            "name": "[variables('keyVaultName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "sku": {
+                    "family": "A",
+                    "name": "standard"
+                },
+                "tenantId": "[subscription().tenantId]",
+                "enabledForDeployment": true,
+                "enabledForTemplateDeployment": true,
+                "enabledForDiskEncryption": true,
+                "enableRbacAuthorization": true,
+                "softDeleteRetentionInDays": 90,
+                "purgeProtectionEnabled": true
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts",
+            "apiVersion": "2023-04-15",
+            "name": "[variables('cosmosDbName')]",
+            "location": "[parameters('location')]",
+            "kind": "GlobalDocumentDB",
+            "properties": {
+                "consistencyPolicy": {
+                    "defaultConsistencyLevel": "Session"
+                },
+                "locations": [
+                    {
+                        "locationName": "[parameters('location')]",
+                        "failoverPriority": 0,
+                        "isZoneRedundant": false
+                    }
+                ],
+                "databaseAccountOfferType": "Standard",
+                "enableAutomaticFailover": false,
+                "enableMultipleWriteLocations": false,
+                "capabilities": [
+                    {
+                        "name": "EnableServerless"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.MachineLearningServices/workspaces",
+            "apiVersion": "2023-10-01",
+            "name": "[variables('mlWorkspaceName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]",
+                "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
+                "[resourceId('Microsoft.Insights/components', variables('appInsightsName'))]",
+                "[resourceId('Microsoft.ContainerRegistry/registries', variables('acrName'))]"
+            ],
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "storageAccount": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]",
+                "keyVault": "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
+                "applicationInsights": "[resourceId('Microsoft.Insights/components', variables('appInsightsName'))]",
+                "containerRegistry": "[resourceId('Microsoft.ContainerRegistry/registries', variables('acrName'))]",
+                "friendlyName": "[concat('3D LDM Workspace - ', parameters('environment'))]",
+                "description": "Azure ML workspace for 3D Latent Diffusion Model development and deployment"
+            }
+        },
+        {
+            "type": "Microsoft.ContainerService/managedClusters",
+            "apiVersion": "2023-10-01",
+            "name": "[variables('aksName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]"
+            ],
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "dnsPrefix": "[concat(variables('resourcePrefix'), '-aks')]",
+                "agentPoolProfiles": [
+                    {
+                        "name": "nodepool1",
+                        "count": "[parameters('aksNodeCount')]",
+                        "vmSize": "[parameters('aksNodeSize')]",
+                        "osDiskSizeGB": 100,
+                        "osDiskType": "Managed",
+                        "osType": "Linux",
+                        "mode": "System",
+                        "enableAutoScaling": true,
+                        "minCount": 1,
+                        "maxCount": 10
+                    }
+                ],
+                "servicePrincipalProfile": {
+                    "clientId": "msi"
+                },
+                "enableRBAC": true,
+                "networkProfile": {
+                    "networkPlugin": "azure",
+                    "serviceCidr": "10.0.0.0/16",
+                    "dnsServiceIP": "10.0.0.10",
+                    "dockerBridgeCidr": "172.17.0.1/16"
+                },
+                "addonProfiles": {
+                    "omsagent": {
+                        "enabled": true,
+                        "config": {
+                            "logAnalyticsWorkspaceResourceID": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]"
+                        }
+                    },
+                    "azurepolicy": {
+                        "enabled": true
+                    }
+                }
+            }
+        },
+        {
+            "condition": "[parameters('enableGpu')]",
+            "type": "Microsoft.ContainerService/managedClusters/agentPools",
+            "apiVersion": "2023-10-01",
+            "name": "[concat(variables('aksName'), '/gpupool')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.ContainerService/managedClusters', variables('aksName'))]"
+            ],
+            "properties": {
+                "count": 1,
+                "vmSize": "Standard_NC6s_v3",
+                "osDiskSizeGB": 100,
+                "osDiskType": "Managed",
+                "osType": "Linux",
+                "mode": "User",
+                "enableAutoScaling": true,
+                "minCount": 0,
+                "maxCount": 3,
+                "nodeLabels": {
+                    "node-type": "gpu-training"
+                },
+                "nodeTaints": [
+                    "nvidia.com/gpu=true:NoSchedule"
+                ]
+            }
+        }
+    ],
+    "outputs": {
+        "resourceGroupName": {
+            "type": "string",
+            "value": "[resourceGroup().name]"
+        },
+        "acrLoginServer": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', variables('acrName'))).loginServer]"
+        },
+        "aksClusterName": {
+            "type": "string",
+            "value": "[variables('aksName')]"
+        },
+        "mlWorkspaceName": {
+            "type": "string",
+            "value": "[variables('mlWorkspaceName')]"
+        },
+        "storageAccountName": {
+            "type": "string",
+            "value": "[variables('storageAccountName')]"
+        },
+        "keyVaultName": {
+            "type": "string",
+            "value": "[variables('keyVaultName')]"
+        },
+        "cosmosDbName": {
+            "type": "string",
+            "value": "[variables('cosmosDbName')]"
+        },
+        "appInsightsName": {
+            "type": "string",
+            "value": "[variables('appInsightsName')]"
+        }
+    }
+}
