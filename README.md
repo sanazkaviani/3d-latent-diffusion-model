@@ -20,7 +20,7 @@ A comprehensive implementation of 3D Latent Diffusion Models for medical image s
 The workflow of the Latent Diffusion Model is depicted in the figure below. It begins by training an autoencoder in pixel space to encode images into latent features. Following that, it trains a diffusion model in the latent space to denoise the noisy latent features. During inference, it first generates latent features from random noise by applying multiple denoising steps using the trained diffusion model. Finally, it decodes the denoised latent features into images using the trained autoencoder.
 
 <p align="center">
-  <img src="./figs/ldm.png" alt="latent diffusion scheme" width="80%">
+  <img src="3d_ldm/figs/ldm.png" alt="latent diffusion scheme" width="80%">
 </p>
 
 ## 📚 Background
